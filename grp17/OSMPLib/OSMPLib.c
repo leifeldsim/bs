@@ -585,7 +585,11 @@ int OSMP_Barrier() {
 
 //    printf("barrier value: %s\n", pthread_barr);
 
-    pthread_barrier_wait(&shm->barrier);
+    int rv = pthread_barrier_wait(&shm->barrier);
+    if(!(rv == PTHREAD_BARRIER_SERIAL_THREAD || rv == 0 )){
+        return OSMP_FAIL;
+    }
+
 
     printf("\t\t\t\tProzess %d finished barrier\n", rank);
 
