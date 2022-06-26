@@ -1,0 +1,76 @@
+- [ ] Sind alle Testprogramme lt. Anleitung zusammen mit der OSMP-Lib fehlerfrei kompilierbar und ausführbar?
+- Natürlich
+---
+- [ ] Was passiert wenn OSM OSMP-Funktionen ohne vorheriges OSMP_Init, oder nach OSMP_Finalize aufgerufen werden, oder wenn die Funktionen fehlschlagen?
+-  OSMP-Fail mit textausgabe
+---
+- [ ] Wie skalieren Ihre Datenstrukturen mit veränderten Größen? Welche Laufzeiten ergeben sich?
+- ???
+---
+- [ ] Was passiert, nachdem das Limit der zu empfangenden Nachrichten pro Prozess erreicht wurde.
+- OSMP Fail mit Textausgabe
+---
+- [x] Wie wird mit Nachrichten verfahren, die die maximal erlaubte Länge beim Senden oder Empfangen überschreiten?
+- Senden: wird nicht erlaubt und mit fail zurückgewiesen
+- empfangen: wird nicht erlaubt und mit fail zurückgewiesen -> wenn len > max_len
+---
+- [ ] Was passiert, wenn ein Sender einem nicht vorhandenen Prozess eine Nachricht sendet und ist es möglich oder sinnvoll, das Messages an bereits beendete Empfänger gesendet werden?
+- beim abmelden -> messages werden wieder in empty gepackt
+- Zu hohe ids werden zurückgewiesen
+- Array für angemeldete Nutzer prüfen -> bei 0 kein senden möglich
+---
+- [ ] Kann man einem Prozess eine Nachricht senden, während er eine Nachricht liest?
+- Wartet auf den Mutex zum schreiben
+---
+- [ ] Wie reagiert Ihre Bibliothek, wenn mehrere Prozesse gleichzeitig eine Nachricht an den selben Empfänger senden?
+- Mutex regelt hoffentlich
+---
+- [ ] Was passiert, wenn der OSMP-Typ der Nachricht beim Senden oder Empfangen nicht einem erwarten OSMP-Typ entspricht?
+- wird zurückgewiesen mit fail
+---
+- [ ] Was passiert mit bereits im Posteingang abgelegten Nachrichten, wenn der Empfänger sich mit OSMP_Finalize abmeldet und sich ggf. später wieder anmeldet?
+- Nachrichten werden "gefreed"
+---
+- [ ] Lassen sich OSMP-Funktionen parallel aufrufen wenn der Anwender Threads verwendet?
+- mutex regelt
+---
+- [x] Lassen sich mehrere Starter mit unterschiedlichen Executables unabhängig voneinander betreiben?
+- pid vor dem shared memory name wie bei anderen
+---
+- [ ] Werden alle System-Ressourcen freigegeben?  Wo und Wann?
+- noch nicht
+---
+- [ ] Führen alle blockierenden Aufrufe zur Blockierung, solange die zugehörigen Bedingungen nicht erfüllt sind? Weisen sie durch Belasten des Systems ggf. nach ob es immer funktioniert.
+-
+---
+- [ ] Was passiert wenn sie eine Barriere aufrufen, wenn sich vorher bereits ein Prozess beendet hat?
+- Durch das 2. anwesenheitsarray wird die Anzahl an Prozessen gelesen und full/empty angepasst
+- was tun wenn er sich währenddessen einfach abmeldet?
+---
+- [ ] Sind bei der Verwendung ihrer OSMP-Lib Deadlocks oder Race-Conditions möglich?
+- Natürlich nicht!
+---
+- [ ] Wie kann der Aufrufer eines asynchronen Send oder Receive erfahren ob und welcher Fehler bei dem im Hintergrund ausgeführten Auftrags aufgetreten ist?
+- Error flag mit irgendwelchen ints drinne
+---
+- [ ] Was passiert wenn der Anwender den selben Request mehrfach verwendet?
+- Alles Tutti, solange das Flag ready ist -> error/working/finished wird nicht zugelassen
+- wann kann es error sein?
+---
+- [ ] Kann OSMP_RemoveRequest aufgerufen werden, obwohl der Requester noch verwendet wird?
+- besser nicht wenn working flag dann wird einfach abgebrochen
+
+
+
+# Zeug, zum vergessen
+
+- Linked List nummerieren für anfang
+- Request ist noch nicht bereit fürs verschicken/senden (finished)
+- irecv was mit source und len wenn thread noch läuft aber irecv schon returned
+- message buf_len ist tatsächliche länge in bytes -> datatype * count
+- Bcast_index sollte am anfang -1 bzw. NO_ROOT sein
+- SD karte cleanen
+- add und get empty slots vlt n osmp_fail einfügen?
+- warten wenn empty slots leer ist? -> abbrechen
+- size =rank+2?
+- OSMP Barrier implementieren

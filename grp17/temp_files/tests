@@ -1,0 +1,313 @@
+int main(int argc, char *argv[]) {
+    int rank;
+
+    if (OSMP_Init(&argc, &argv) == OSMP_ERROR) {
+        fprintf(stderr, "TEST !0.1: failure during init\n");
+        return OSMP_ERROR;
+    }
+
+    rank = -1;
+    if (OSMP_Rank(&rank) || rank == -1) {
+        fprintf(stderr, "TEST 0.2: failure while determining ranking\n");
+        return OSMP_ERROR;
+    }
+
+    if (rank == 0) {
+        char buf[15] = "";
+        int source, len;
+        for (int i = 0; i < 2; ++i) {
+            if (OSMP_Recv(&buf, 10, OSMP_BYTE, &source, &len))
+                fprintf(stderr, "TEST 0.3: Failed receive message %d\n", i);
+        }
+        //free(buf);
+    } else {
+        char *message = "TestMsg";
+        if (OSMP_Send(message, 7, OSMP_BYTE, 0))
+            fprintf(stderr, "TEST 0.4: Rank %d failed send message\n", rank);
+    }
+}
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    int rv = -1;
+    char buf[15] = "";
+    if (OSMP_Rank(&rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.1: OSMP_Rank return not normal before init\n");
+    if (OSMP_Size(&rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.2: OSMP_Size return not normal before init\n");
+    if (OSMP_Send("data", 5, OSMP_BYTE, 0) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.3: OSMP_Send return not normal before init\n");
+    if (OSMP_Recv(&buf, 5, OSMP_BYTE, &rv, &rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.4: OSMP_Recv return not normal before init\n");
+
+    if (OSMP_Finalize() != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.5: OSMP_Finalize return not normal before init\n");
+
+    //    valid section
+    if (OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "TEST !2.6: unexpected failure\n");
+    if (OSMP_Finalize())
+        fprintf(stderr, "TEST !2.7: unexpected failure\n");
+    //    end valid section
+
+
+
+    if (OSMP_Rank(&rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.8: OSMP_Rank return not normal after finalize\n");
+    if (OSMP_Size(&rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.9: OSMP_Size return not normal after finalize\n");
+    if (OSMP_Send("data", 5, OSMP_BYTE, 0) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.10: OSMP_Send return not normal after finalize\n");
+    if (OSMP_Recv(&buf, 5, OSMP_BYTE, &rv, &rv) != OSMP_ERROR)
+        fprintf(stderr, "TEST 2.11: OSMP_Recv return not normal after finalize\n");
+
+    //free(buf);
+}
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "TEST 3.1: OSMP_Init: unexpected failure\n");
+
+    int client_number;
+    OSMP_Size(&client_number);
+
+    char *message = "msg that is 2k bytes large";
+    if(OSMP_Send(message, 2000, OSMP_BYTE, client_number) != OSMP_ERROR)
+        fprintf(stderr, "TEST 3.2: OSMP_Send: unexpected failure\n");
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST 3.3: OSMP_Finalize: unexpected failure\n");
+}
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "Test 4.1: OSMP_Init: unexpected failure\n");
+
+    int client_number;
+    OSMP_Size(&client_number);
+    char *message = "TestMsg";
+
+    if(OSMP_Send(message, strlen(message), OSMP_BYTE, client_number + 1) != OSMP_ERROR)
+        fprintf(stderr, "TEST 4.2: OSMP_Send: unexpected failure\n");
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST 4.3: OSMP_Finalize: unexpected failure\n");
+}
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "TEST 5.1: OSMP_Init: unexpected failure\n");
+
+    int rank;
+    if(OSMP_Rank(&rank) == OSMP_ERROR)
+        fprintf(stderr, "TEST 5.2: OSMP_Rank: unexpected failure\n");
+
+    if(rank == 1){
+        sleep(2);
+        char *message = "TestMsg";
+        if(OSMP_Send(message, strlen(message), OSMP_BYTE, 0) != OSMP_ERROR)
+            fprintf(stderr, "TEST 5.3: OSMP_Send: unexpected failure\n");
+    }
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST 5.4: OSMP_Finalize: unexpected failure\n");
+}
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "TEST !6.1: OSMP_Init: unexpected failure\n");
+
+
+    if(OSMP_Rank(NULL) != OSMP_ERROR)
+        fprintf(stderr, "TEST !6.2: OSMP_Rank: unexpected failure\n");
+
+    char *message = "TestMsg";
+    if(OSMP_Send(NULL, strlen(message), OSMP_BYTE, 0) != OSMP_ERROR)
+        fprintf(stderr, "TEST !6.3: OSMP_Send: unexpected failure\n");
+    if(OSMP_Size(NULL) != OSMP_ERROR)
+        fprintf(stderr, "TEST !6.4: OSMP_Size: unexpected failure\n");
+    if(OSMP_Recv(NULL, 1, OSMP_BYTE,NULL, NULL) != OSMP_ERROR)
+        fprintf(stderr, "TEST !6.5: OSMP_Recv: unexpected failure\n");
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST !6.6: OSMP_Finalize: unexpected failure\n");
+}
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
+        fprintf(stderr, "TEST !7.1: OSMP_Init: unexpected failure\n");
+
+    int rank;
+    if(OSMP_Rank(&rank) == OSMP_ERROR)
+        fprintf(stderr, "TEST !7.2: OSMP_Rank: unexpected failure\n");
+
+    char *message = "TestMsg";
+    if(OSMP_Send(message, strlen(message), 999, 0) != OSMP_ERROR)
+        fprintf(stderr, "TEST !7.3: OSMP_Send: unexpected failure\n");
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST !7.4: OSMP_Finalize: unexpected failure\n");
+}
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+
+    int rank, size = -1;
+
+    if (OSMP_Init(&argc, &argv) == OSMP_ERROR) {
+        fprintf(stderr, "TEST !8.1: failure during init\n");
+        return OSMP_ERROR;
+    }
+
+    if (OSMP_Rank(&rank) || rank == -1) {
+        fprintf(stderr, "TEST !8.2: failure while determining ranking\n");
+        return OSMP_ERROR;
+    }
+
+    if (OSMP_Size(&size) || size == -1) {
+        fprintf(stderr, "TEST !8.3: unexpected failure during OSMP_size");
+        return OSMP_ERROR;
+    }
+
+
+    if (rank == 0) {
+        for (int i = 0; i < 272; i++) {
+            if (OSMP_Send("TestMsg", 7, OSMP_BYTE, (i % (size - 1) + 1))) {
+                fprintf(stderr, "TEST !8.4: unexpected failure during Send");
+                return OSMP_ERROR;
+            }
+        }
+        printf("All message send\n");
+    } else {
+        sleep(4);
+        for (int i = 0; i < 16; i++) {
+            char buf[20];
+            int source, len;
+            if (OSMP_Recv(buf, 7, OSMP_BYTE, &source, &len)) {
+                fprintf(stderr, "TEST !8.5: unexpected failure during Receive");
+                return OSMP_ERROR;
+            }
+        }
+    }
+
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+    int size, rank, source = -2, len = -1;
+    int bufin[1] = {1129};
+    int bufout[1];
+    OSMP_Request myrequest = NULL;
+
+    if (OSMP_Init(&argc, &argv) == OSMP_ERROR) {
+        fprintf(stderr, "TEST ASYNC.1: OSMP_Init: failure during init\n");
+        return OSMP_ERROR;
+    }
+    if (OSMP_Size(&size) || (size < 1)) {
+        fprintf(stderr, "Test ASYNC.2: Please initalize more than 1 Processes!");
+        return OSMP_ERROR;
+    }
+    if (OSMP_Rank(&rank) || rank == -1) {
+        fprintf(stderr, "TEST ASYNC.3: failure while determining ranking\n");
+        return OSMP_ERROR;
+    }
+
+//Recv - ISend Test
+
+    if (rank == 0) { // OSMP process 0
+        printf("Send package:\n");
+        OSMP_CreateRequest(&myrequest);
+
+        OSMP_Isend(bufin, 1, OSMP_INT, 1, myrequest);
+        OSMP_Wait(myrequest);
+        if(        OSMP_RemoveRequest(&myrequest)==  OSMP_ERROR){
+            printf("ERRor\n");
+        }
+
+    } else { // OSMP process 1
+        OSMP_Recv(bufout, 1, OSMP_INT, &source, &len);
+        printf("Recv1: %d\n", bufout[0]);
+    }
+
+    if (OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST ASYNC: OSMP_Finalize: unexpected failure\n");
+    return OSMP_SUCCESS;
+}
+
+
+
+
+
+
+
+int main(int argc, char *argv[]) {
+    int size, rank = -1;
+    char bufTest[] = "Test-Msg";
+    char bufoutTest[8] = "";
+    int rank_bcast_admin = 0;
+
+    if (OSMP_Init(&argc, &argv) == OSMP_ERROR) {
+        fprintf(stderr, "TEST BCAST.1: OSMP_Init: failure during init\n");
+        return OSMP_ERROR;
+    }
+
+    if(OSMP_Size(&size) || (size < 50)){
+        fprintf(stderr,"Test BCAST.2: Please initalize more than 50 Processes!");
+        return OSMP_ERROR;
+    }
+
+    if (OSMP_Rank(&rank) || rank == -1) {
+        fprintf(stderr, "TEST Bcast.3: failure while determining ranking\n");
+        return OSMP_ERROR;
+    }
+
+    if(rank == 0){//write
+        if(OSMP_Bcast(&bufTest, strlen(bufTest) , OSMP_UNSIGNED_CHAR, rank_bcast_admin) == OSMP_ERROR)
+            fprintf(stderr, "TEST BCAST.5: OSMP_Bcast: (root) unexpected failure\n");
+    } else{//read
+        if(OSMP_Bcast(&bufoutTest, strlen(bufTest) , OSMP_UNSIGNED_CHAR, rank_bcast_admin) == OSMP_ERROR)
+            fprintf(stderr, "TEST BCAST.6: OSMP_Bcast: unexpected failure\n");
+    }
+
+    if(OSMP_Finalize() == OSMP_ERROR)
+        fprintf(stderr, "TEST Bcast.7: OSMP_Finalize: unexpected failure\n");
+}
