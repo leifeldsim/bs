@@ -5,13 +5,13 @@
 #include <time.h>
 #include <stdlib.h>
 #include "OSMPLib/OSMPLib.h"
+#include "tests/Error_handling_OSMPLib/error_handling_OSMPLib.h"
 
 
 int getRandomDest(int rank, int size){
     srand(time(NULL));
     int randNum;
     int temp;
-    int ran = rand();
     do{
         printf("rand Size: %d\n", size);
         fflush(stdout);
@@ -22,29 +22,13 @@ int getRandomDest(int rank, int size){
 
 //argv[3] muss shm_name sein
 int main(int argc,char *argv[]) {
-    if (argc < 3){
-        return -1;
-    }
-
-    if(OSMP_Init(&argc, &argv) == OSMP_FAIL){
-        printf("Error OSMP_Init\n");
-        fflush(stdout);
-        return -1;
-    }
-
     int rank;
-    if(OSMP_Rank(&rank) == OSMP_FAIL){
-        printf("Error OSMP_Rank\n");
-        fflush(stdout);
-        return -1;
-    }
-
     int size;
-    if(OSMP_Size(&size) == OSMP_FAIL){
-        printf("Error OSMP_Size\n");
-        fflush(stdout);
-        return -1;
-    }
+
+    test_enough_params(argc);
+    test_OSMP_Init(argc, argv);
+    test_OSMP_Rank(&rank);
+    test_OSMP_Size(&size);
     printf("pid: %d: rank: %d, size = %d\n", getpid(), rank, size);
 
     int dst = getRandomDest(rank, size);
@@ -56,6 +40,9 @@ int main(int argc,char *argv[]) {
     printf("%s\n\n", msg);
     int src;
     int length;
+
+    OSMP_Barrier();
+
     if (OSMP_Send(msg, count, OSMP_CHAR, dst) == OSMP_FAIL) {
         printf("OSMP_Send failed\n");
         return OSMP_FAIL;

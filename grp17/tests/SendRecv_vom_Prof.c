@@ -18,20 +18,24 @@ int main(int argc, char *argv[])
     rv = OSMP_Size( &size );
     rv = OSMP_Rank( &rank );
     if( size != 2 ) { /* Fehlerbehandlung */ }
+    OSMP_Barrier();
     if( rank == 0 ){ // OSMP process 0
         bufin[0] = 4711;
         bufin[1] = 4712;
         rv = OSMP_Send( bufin, 2, OSMP_INT, 1 );
         if(rv == OSMP_FAIL){
-            printf("OSMP_Send failed");
+            printf("OSMP_Send failed\n");
         }
     }
     else{ // OSMP process 1
         rv = OSMP_Recv( bufout, 2, OSMP_INT, &source, &len );
         if(rv == OSMP_FAIL){
-            printf("OSMP_Recv failed");
+            printf("OSMP_Recv failed\n");
+        }else if(rv == OSMP_INBOX_EMPTY) {
+            printf("Es kann keine Nachricht ausgelesen werden!\n");
         }else{
             printf("OSMP process %d received %d byte from %d [%d:%d] \n", rank, len, source, bufout[0], bufout[1]);
+
         }
     }
     rv = OSMP_Finalize();

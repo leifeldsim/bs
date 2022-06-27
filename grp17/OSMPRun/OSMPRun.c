@@ -122,7 +122,7 @@ int init_shm(struct shared_memory* shm){
     for (int i = 0; i < MAX_PROC; i++) {
         shm->first_inbox[i] = NO_NEXT_MESSAGE;
         shm->last_inbox[i] = NO_NEXT_MESSAGE;
-        shm->process_ready[i] = PROCESS_NOT_READY;
+        shm->process_ready[i] = PROCESS_NOT_INITIALIZED;
     }
 
     // Nur bis OSMP_MAX_SLOTS-1, da letzte Nachricht nicht mitverkettet wird
@@ -143,17 +143,16 @@ int init_shm(struct shared_memory* shm){
 
     if(sem_init(&shm->mutex_count_procs, 1, 1)) {return error("sem_init mutex_count_procs");}
 
-    if(sem_init(&shm->mutex_bcast_create_msg, 1, 1)) {return error("sem_init bcast_create_msg");}
     if(sem_init(&shm->mutex_is_free_to_read, 1, 1)) {return error("sem_init bcast_seen_msg");}
-    if(sem_init(&shm->full_bcast, 1, (unsigned int) proc_count)) {return error("sem_init full_bcast");}
-    if(sem_init(&shm->empty_bcast, 1, 0)) {return error("sem_init empty_bcast");}
-
+    if(sem_init(&shm->mutex_barrier_init, 1, 1)) {return error("sem_init bcast_seen_msg");}
+    if(sem_init(&shm->mutex_barrier_running, 1, 1)) {return error("sem_init bcast_seen_msg");}
+    if(sem_init(&shm->mutex_barrier_finalize, 1, 1)) {return error("sem_init bcast_seen_msg");}
 
     pthread_barrierattr_t barrier_attr;
     pthread_barrierattr_init(&barrier_attr);
     pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
     pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) proc_count);
-
+    shm->barrier_running_count = 0;
 
     return OSMP_SUCCESS;
 }

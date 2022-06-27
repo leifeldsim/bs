@@ -65,10 +65,10 @@ int check_non_reachable_rank(int proc_rank) {
         fprintf(stderr, "Prozess %d ist nicht vorhanden\n", proc_rank);
         return OSMP_FAIL;
     }
-//    else if (shm->process_ready[proc_rank] == PROCESS_NOT_READY) {
-//        printf("Prozess %d ist im moment nicht aktiv", proc_rank);
-//        return OSMP_FAIL;
-//    }
+    else if (shm->process_ready[proc_rank] != PROCESS_READY) {
+        printf("Prozess %d ist im moment nicht aktiv\n", proc_rank);
+        return OSMP_FAIL;
+    }
     return OSMP_SUCCESS;
 }
 
@@ -104,13 +104,17 @@ int OSMP_Init(int *argc, char ***argv) {
     printf("Prozess %d hat Init aufgerufen\n", rank);
 
     int active;
-
-    //TODO brauchen wir nicht mehr?
-    //if(active != 1){
-    //    sem_post(&shm->empty_barrier);
-    //}
-
     get_num_of_active_procs(&active);
+
+    if(shm->process_ready[rank] == PROCESS_NOT_READY){
+        sem_wait(&shm->mutex_barrier_init);
+        pthread_barrierattr_t barrier_attr;
+        pthread_barrierattr_init(&barrier_attr);
+        pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
+        printf("OSMP_Init barrier init: %d\n", active);
+        pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) active);
+        sem_post(&shm->mutex_barrier_init);
+    }
     return OSMP_SUCCESS;
 }
 
@@ -191,10 +195,7 @@ int add_message_to_empty_slots(int message_index) {
 
 
 int read_msg_to_buf(void *buf, int message_index, int count) {
-    printf("message_index: %d\n", message_index);
-    printf("Count: %d\n", count);
     for (int i = 0; i < count; i++) {
-        printf("%d\n\n", i);
         //printf("%s hellooo\n", (char*) shm->S[message_index].buf[i]);
         ((OSMP_Datatype*) buf)[i] = shm->S[message_index].buf[i];
     }
@@ -290,6 +291,8 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
     printf("Empfänger: %d\n", shm->S[message_index].receiver);
     printf("Tatsächlicher Empfänger %d\n", recv_index);
 //    printf("Nachricht: %s\n", (char*)shm->S[message_index].buf); //funktioniert
+
+    *len = (int) (shm->S[message_index].type * (unsigned int) count);
 
     *source = shm->S[message_index].sender;
 
@@ -546,21 +549,65 @@ int OSMP_Finalize(void) {
     int rank;
     OSMP_Rank(&rank);
 //    remove_all_messages_from_inbox(rank);
+//    sem_wait(&shm->mutex_barrier_finalize);
+//    if (shm->barrier_running_count > 0){
+//        printf("Finalize nicht während Barrier möglich");
+//        OSMP_Barrier();
+//    }
+
     shm->process_ready[rank] = PROCESS_NOT_READY;
     int num_ready_procs;
     get_num_of_active_procs(&num_ready_procs);
 
+    while(shm->barrier_running_count != 0){
 
+    }
+//    sem_wait(&shm->mutex_barrier_init);
+
+    pthread_barrierattr_t barrier_attr;
+    pthread_barrierattr_init(&barrier_attr);
+    pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
+    pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) num_ready_procs);
+//    sem_post(&shm->mutex_barrier_init);
+
+    printf("Prozess %d hat finalize aufgerufen. %d\n", rank, num_ready_procs);
+
+//    sem_post(&shm->mutex_barrier_finalize);
 
     if(munmap(shm, TEMP_LENGTH) == -1){
         printf("Error child: munmap");
         return OSMP_FAIL;
     }
-    //TODO Für Barrier anzahl an prozessen neuinitialisieren (pthread_barrier)
-    printf("Prozess %d hat finalize aufgerufen\n", rank);
+
     return OSMP_SUCCESS;
 }
 
+
+int OSMP_Barrier() {
+
+    sem_wait(&shm->mutex_barrier_running);
+    shm->barrier_running_count++;
+    sem_post(&shm->mutex_barrier_running);
+    int rank;
+    OSMP_Rank(&rank);
+
+    sem_wait(&shm->mutex_barrier_init);
+    sem_post(&shm->mutex_barrier_init);
+//    sem_wait(&shm->mutex_barrier_finalize);
+//    sem_post(&shm->mutex_barrier_finalize);
+    printf("\t\tProzess %d started barrier\n", rank);
+    int rv = pthread_barrier_wait(&shm->barrier);
+    if(!(rv == PTHREAD_BARRIER_SERIAL_THREAD || rv == 0 )){
+        return OSMP_FAIL;
+    }
+    printf("\t\t\t\tProzess %d finished barrier\n", rank);
+
+    sem_wait(&shm->mutex_barrier_running);
+    shm->barrier_running_count--;
+    sem_post(&shm->mutex_barrier_running);
+
+    return OSMP_SUCCESS;
+}
 
 int OSMP_Test(OSMP_Request request, int *flag){
     //todo status von request in flag schreiben und dirket returnen
@@ -576,26 +623,6 @@ int OSMP_Wait (OSMP_Request request){
     sem_post(&req->mutex_is_working);
     return OSMP_SUCCESS;
 }
-
-
-int OSMP_Barrier() {
-    int rank;
-    OSMP_Rank(&rank);
-    printf("\t\tProzess %d started barrier\n", rank);
-
-//    printf("barrier value: %s\n", pthread_barr);
-
-    int rv = pthread_barrier_wait(&shm->barrier);
-    if(!(rv == PTHREAD_BARRIER_SERIAL_THREAD || rv == 0 )){
-        return OSMP_FAIL;
-    }
-
-
-    printf("\t\t\t\tProzess %d finished barrier\n", rank);
-
-    return OSMP_SUCCESS;
-}
-
 
 //---------------------------Hilfsfunktionen-Start------------------------------------------------------------------------------
 
@@ -640,9 +667,14 @@ int depr_is_free_slots_used() {
 
 
 int get_num_of_active_procs(int *count){
+    int active_count = 0;
     for(int i = 0; i < MAX_PROC; i++){
-        *count += shm->process_ready[i];
+        if(shm->process_ready[i] == PROCESS_READY){
+            active_count++;
+        }
     }
+    printf("Active Count: %d \n", active_count);
+    *count = active_count;
 }
 
 

@@ -20,6 +20,10 @@ typedef void* OSMP_Request;
 #define OSMP_INBOX_EMPTY 2
 #define PROCESS_READY 1
 #define PROCESS_NOT_READY 0
+#define PROCESS_NOT_INITIALIZED -1
+
+#define BARRIER_NOT_RUNNING 0
+#define BARRIER_RUNNING 1
 
 //Nachrichten Verkettung
 #define NO_NEXT_MESSAGE -1
@@ -34,7 +38,7 @@ typedef void* OSMP_Request;
 #define NO_ROOT -1
 #define OSMP_BROADCAST_RECEIVER -100
 
-#define TEMP_LENGTH 1064504 //todo ändern
+#define TEMP_LENGTH 1064384 //todo ändern
 
 typedef enum {
     OSMP_SHORT=sizeof(short),
@@ -117,10 +121,7 @@ struct shared_memory{
     int root_rank;
     int bcast_msg_index;
     int bcast_error_code;
-    sem_t mutex_bcast_create_msg; //TODO vlt unnötig
     sem_t mutex_is_free_to_read; //TODO anders initialisieren
-    sem_t full_bcast;
-    sem_t empty_bcast;
 
     //Inbox
     int first_inbox[MAX_PROC];
@@ -136,9 +137,13 @@ struct shared_memory{
     sem_t full_empty_slots;
     sem_t empty_empty_slots;
 
-
-
+    //Barrier
     pthread_barrier_t barrier;
+    sem_t mutex_barrier_init;
+    sem_t mutex_barrier_finalize;
+
+    sem_t mutex_barrier_running;
+    int barrier_running_count;
 };
 
 #endif
