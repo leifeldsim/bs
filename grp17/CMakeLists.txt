@@ -43,9 +43,6 @@ target_link_libraries(test_SendIrecv_gegeben rt pthread)
 add_executable(testBarrier tests/Barrier.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
 target_link_libraries(testBarrier rt pthread)
 
-add_executable(testBarrierReInit tests/BarrierReInit.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
-target_link_libraries(testBarrierReInit rt pthread)
-
 add_executable(test_wait_for_max_msg tests/Wait_for_max_msg.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
 target_link_libraries(test_wait_for_max_msg rt pthread)
 

@@ -42,6 +42,10 @@ void test_OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest
     }
 }
 
+void test_osmp_reinit(){
+    OSMP_Test(NULL, 0);
+}
+
 void test_enough_params(int argc) {
     if (argc < 3){
         exit(-1);

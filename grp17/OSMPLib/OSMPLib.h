@@ -38,7 +38,7 @@ typedef void* OSMP_Request;
 #define NO_ROOT -1
 #define OSMP_BROADCAST_RECEIVER -100
 
-#define TEMP_LENGTH 1064384 //todo ändern
+#define TEMP_LENGTH 1064464 //todo ändern
 
 typedef enum {
     OSMP_SHORT=sizeof(short),
@@ -138,6 +138,7 @@ struct shared_memory{
     sem_t empty_empty_slots;
 
     //Barrier
+    pthread_barrierattr_t barrier_attr;
     pthread_barrier_t barrier;
     sem_t mutex_barrier_init;
     sem_t mutex_barrier_finalize;

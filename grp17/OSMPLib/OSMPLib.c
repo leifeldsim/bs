@@ -32,17 +32,17 @@ void debug_print(char specification[], char value[]) {
     printf("%s%s\n", specification, value);
 }
 
-
-
-
 //Feststellen, ob Request bereit zum Arbeiten ist
-int check_request(OSMP_Request_t* request) {
+int check_request_send(OSMP_Request_t* request) {
+    printf("check request start\n");
     if (request == NULL) {
         fprintf(stderr, "Request is null\n");
         return OSMP_FAIL;
     }
+    printf("nach if\n");
 
     int status = request->status;
+    printf("nach status abfrage: %d\n", request->status);
     if (status != OSMP_REQUEST_READY) {
         if (status == OSMP_REQUEST_FINISHED) printf("Request wurde noch nicht ausgelesen\n");
         if (status == OSMP_REQUEST_ERROR) printf("Thread konnte seine Aufgabe nicht erledigen\n");
@@ -54,6 +54,24 @@ int check_request(OSMP_Request_t* request) {
 }
 
 
+
+int check_request_recv(OSMP_Request_t* request) {
+    if (request == NULL) {
+        fprintf(stderr, "Request is null\n");
+        return OSMP_FAIL;
+    }
+
+    int status = request->status;
+    OSMP_Wait(request);
+    if (status != OSMP_REQUEST_FINISHED) {
+        if (status == OSMP_REQUEST_READY) printf("Buffer wurde schon ausgelesen/noch nicht befüllt\n");
+        if (status == OSMP_REQUEST_ERROR) printf("Thread konnte seine Aufgabe nicht erledigen\n");
+        if (status == OSMP_REQUEST_WORKING) printf("Thread ist noch am arbeiten\n");
+
+        return OSMP_FAIL;
+    }
+    return OSMP_SUCCESS;
+}
 
 
 
@@ -106,15 +124,6 @@ int OSMP_Init(int *argc, char ***argv) {
     int active;
     get_num_of_active_procs(&active);
 
-    if(shm->process_ready[rank] == PROCESS_NOT_READY){
-        sem_wait(&shm->mutex_barrier_init);
-        pthread_barrierattr_t barrier_attr;
-        pthread_barrierattr_init(&barrier_attr);
-        pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
-        printf("OSMP_Init barrier init: %d\n", active);
-        pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) active);
-        sem_post(&shm->mutex_barrier_init);
-    }
     return OSMP_SUCCESS;
 }
 
@@ -229,7 +238,7 @@ int move_first_inbox_to_free_slots(int inbox_index) {
 
 
 int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
-    printf("OSMP_Send called with params: count: %d dest: %d\n", count, dest);
+    printf("OSMP_Send called with params: count: %d dest: %d msg:%s\n", count, dest, (const char*) buf);
     fflush(stdout);
 
     //Fehlerfälle
@@ -248,19 +257,22 @@ int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
     int rank;
     OSMP_Rank(&rank);
     write_into_message(message_index, rank, dest, datatype, buf, count);
-
     // Receiver Inbox neu verbinden
+    printf("vor sem_empty_inbox\n");
     sem_wait(&shm->empty_inbox[dest]);
+    printf("nach sem_empty_inbox\n");
     if (shm->first_inbox[dest] == -1) {     // Keine Nachrichten in der Inbox
         shm->first_inbox[dest] = message_index;
     }
     else {      // Nachrichten in der Inbox vorhanden
         change_next_message_index(index_last_message_of_dest, message_index);
     }
+    printf("nach ifelse\n");
     change_next_message_index(message_index, NO_NEXT_MESSAGE);    //nicht unbedingt nötig - Zu besseren Leserlichkeit
+    printf("next msg index\n");
     shm->last_inbox[dest] = message_index;
     sem_post(&shm->full_inbox[dest]);
-
+    printf("Send finished\n");
     return OSMP_SUCCESS;
 }
 
@@ -413,20 +425,18 @@ int OSMP_RemoveRequest(OSMP_Request* request){
     return OSMP_SUCCESS;
 }
 
-
-
-
-
 void thread_set_working(OSMP_Request_t* request){
     request->status = OSMP_REQUEST_WORKING;
     sem_wait(&request->mutex_is_working);
 }
 
-
-
-
-
 void thread_set_finished(OSMP_Request_t* request, int return_value){
+    printf("request status geaendert zu %d\n", request->status);
+    printf("OSMP_REQUEST_ERROR: %d", OSMP_REQUEST_ERROR);
+    printf("OSMP_REQUEST_READY: %d", OSMP_REQUEST_READY);
+    printf("OSMP_REQUEST_FINISHED: %d", OSMP_REQUEST_FINISHED);
+    printf("OSMP_REQUEST_WORKING: %d", OSMP_REQUEST_WORKING);
+
     if (return_value == OSMP_FAIL){
         request->status = OSMP_REQUEST_ERROR;
     }else{
@@ -437,22 +447,16 @@ void thread_set_finished(OSMP_Request_t* request, int return_value){
 
 
 void* thread_send(void* request) {
-
-    printf("Request als Hex(in Funktion): %x\n", request);
-
     OSMP_Request_t* req = (OSMP_Request_t*) request;
-
-    printf("Request als Hex(nach Cast): %x\n", req);
-
     printf("Thread send started\n");
     printf("\t\t\t request_dest: %d\n", req->dest);
-    fflush(stdout);
     thread_set_working(req);
 
     int rv = OSMP_Send(req->buffer, req->count,req->datatype, req->dest);
     if(rv == OSMP_FAIL){
         printf("OSMP_Send in thread_send failed\n");
     }
+    printf("OSMP_Send finished\n");
     thread_set_finished(req, rv);
     return NULL;
 }
@@ -475,10 +479,10 @@ void* thread_recv(void* request) {
 
 
 int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSMP_Request request) {
-
+    printf("ISend opened\n");
     OSMP_Request_t* req = (OSMP_Request_t*) request;
 
-    if (check_request(request) == OSMP_FAIL) return OSMP_FAIL;
+    if (check_request_send(req) == OSMP_FAIL) return OSMP_FAIL;
     if (check_message_len(count, datatype) == OSMP_FAIL) return OSMP_FAIL;
     if (check_non_reachable_rank(dest) == OSMP_FAIL) return OSMP_FAIL;
 
@@ -491,14 +495,11 @@ int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
     printf("Request als Hex: %x\n", req);
 
     printf("reqbuffer:%s buf:%s reqdest: %d dest: %d\n", (char*) req->buffer, (char*) buf, req->dest, dest);
-    fflush(stdout);
+
     pthread_t tid;
 
-    //thread_send(req);
-
     if (pthread_create(&tid, NULL, thread_send, req) != 0){
-        printf("pthread_create macht Schwierigkeiten\n");
-        fflush(stdout);
+        printf("Error pthread_create ISend\n");
         return OSMP_FAIL;
     }
     req->tid = tid;
@@ -510,22 +511,22 @@ int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
 int OSMP_Irecv(void *buf, int count, OSMP_Datatype datatype,int *source, int *len, OSMP_Request request){
     OSMP_Request_t* req = (OSMP_Request_t*) request;
 
-    if (check_request(request) == OSMP_FAIL) return OSMP_FAIL;
+    if (check_request_recv(req) == OSMP_FAIL) return OSMP_FAIL;
 
     req->count = count;
     req->datatype = datatype;
-    source = req->source;
-    len = req->len;
     pthread_t tid;
 
 
     int return_value = pthread_create(&tid, NULL, thread_recv, req);
     if (return_value != 0) {
-        fprintf(stderr, "pthread_create macht Schwierigkeiten\n");
-        return OSMP_FAIL;
+        fprintf(stderr, "Error pthread_create IRecv\n");
     }
 
     req->tid = tid;
+    source = req->source;
+    len = req->len;
+    buf = req->buffer;
     return OSMP_SUCCESS;
 
 }
@@ -548,31 +549,11 @@ int remove_all_messages_from_inbox(int inbox_index) {
 int OSMP_Finalize(void) {
     int rank;
     OSMP_Rank(&rank);
-//    remove_all_messages_from_inbox(rank);
-//    sem_wait(&shm->mutex_barrier_finalize);
-//    if (shm->barrier_running_count > 0){
-//        printf("Finalize nicht während Barrier möglich");
-//        OSMP_Barrier();
-//    }
-
     shm->process_ready[rank] = PROCESS_NOT_READY;
     int num_ready_procs;
     get_num_of_active_procs(&num_ready_procs);
 
-    while(shm->barrier_running_count != 0){
-
-    }
-//    sem_wait(&shm->mutex_barrier_init);
-
-    pthread_barrierattr_t barrier_attr;
-    pthread_barrierattr_init(&barrier_attr);
-    pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
-    pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) num_ready_procs);
-//    sem_post(&shm->mutex_barrier_init);
-
     printf("Prozess %d hat finalize aufgerufen. %d\n", rank, num_ready_procs);
-
-//    sem_post(&shm->mutex_barrier_finalize);
 
     if(munmap(shm, TEMP_LENGTH) == -1){
         printf("Error child: munmap");
@@ -582,8 +563,22 @@ int OSMP_Finalize(void) {
     return OSMP_SUCCESS;
 }
 
+//1 - nein
+//0 - ja
+int has_any_process_signed_off(){
+    for(int i = 0; i < MAX_PROC; i++){
+        if(shm->process_ready[i] == PROCESS_NOT_READY){
+            return 1;
+        }
+    }
+    return 0;
+}
 
 int OSMP_Barrier() {
+    if(has_any_process_signed_off()){
+        printf("Barrier nicht mehr möglich nachdem sich ein Prozess abgemeldet hat!\n");
+        return OSMP_FAIL;
+    }
 
     sem_wait(&shm->mutex_barrier_running);
     shm->barrier_running_count++;
@@ -591,10 +586,6 @@ int OSMP_Barrier() {
     int rank;
     OSMP_Rank(&rank);
 
-    sem_wait(&shm->mutex_barrier_init);
-    sem_post(&shm->mutex_barrier_init);
-//    sem_wait(&shm->mutex_barrier_finalize);
-//    sem_post(&shm->mutex_barrier_finalize);
     printf("\t\tProzess %d started barrier\n", rank);
     int rv = pthread_barrier_wait(&shm->barrier);
     if(!(rv == PTHREAD_BARRIER_SERIAL_THREAD || rv == 0 )){
@@ -605,6 +596,8 @@ int OSMP_Barrier() {
     sem_wait(&shm->mutex_barrier_running);
     shm->barrier_running_count--;
     sem_post(&shm->mutex_barrier_running);
+
+    //todo Idee, falls bool für barrierFinished gebraucht wird, kann hier einfach running_count == 0 geprüft werden
 
     return OSMP_SUCCESS;
 }
@@ -619,6 +612,7 @@ int OSMP_Test(OSMP_Request request, int *flag){
 int OSMP_Wait (OSMP_Request request){
     //todo solange warten bis request.status finished ist und danach returnen
     OSMP_Request_t* req = (OSMP_Request_t*) request;
+    //vielleicht auf pthread umstellen
     sem_wait(&req->mutex_is_working);
     sem_post(&req->mutex_is_working);
     return OSMP_SUCCESS;
@@ -673,7 +667,6 @@ int get_num_of_active_procs(int *count){
             active_count++;
         }
     }
-    printf("Active Count: %d \n", active_count);
     *count = active_count;
 }
 

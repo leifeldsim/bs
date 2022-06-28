@@ -148,10 +148,9 @@ int init_shm(struct shared_memory* shm){
     if(sem_init(&shm->mutex_barrier_running, 1, 1)) {return error("sem_init bcast_seen_msg");}
     if(sem_init(&shm->mutex_barrier_finalize, 1, 1)) {return error("sem_init bcast_seen_msg");}
 
-    pthread_barrierattr_t barrier_attr;
-    pthread_barrierattr_init(&barrier_attr);
-    pthread_barrierattr_setpshared(&barrier_attr, PTHREAD_PROCESS_SHARED);
-    pthread_barrier_init(&shm->barrier, &barrier_attr, (unsigned int) proc_count);
+    pthread_barrierattr_init(&shm->barrier_attr);
+    pthread_barrierattr_setpshared(&shm->barrier_attr, PTHREAD_PROCESS_SHARED);
+    pthread_barrier_init(&shm->barrier, &shm->barrier_attr, (unsigned int) proc_count);
     shm->barrier_running_count = 0;
 
     return OSMP_SUCCESS;
