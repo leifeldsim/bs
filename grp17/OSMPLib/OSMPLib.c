@@ -44,17 +44,18 @@ int check_request_send(OSMP_Request_t* request) {
         fprintf(stderr, "Request is null\n");
         return OSMP_FAIL;
     }
-    printf("nach if\n");
 
     int status = req->status;
-    printf("nach status abfrage: %d\n", req->status);
+    printf("status: %d, sollte: %d\n", req->status, OSMP_REQUEST_READY);
+    fflush(stdout);
     if (status != OSMP_REQUEST_READY) {
         if (status == OSMP_REQUEST_FINISHED) printf("Request wurde noch nicht ausgelesen\n");
         if (status == OSMP_REQUEST_ERROR) printf("Thread konnte seine Aufgabe nicht erledigen\n");
         if (status == OSMP_REQUEST_WORKING) printf("Thread ist noch am arbeiten\n");
-
+        fflush(stdout);
         return OSMP_FAIL;
     }
+    fflush(stdout);
     return OSMP_SUCCESS;
 }
 
@@ -207,6 +208,8 @@ int add_message_to_empty_slots(int message_index) {
 
 
 int read_msg_to_buf(void *buf, int message_index, int count) {
+    printf("read_msg_to_buf\n");
+    fflush(stdout);
     for (int i = 0; i < count; i++) {
         //printf("%s hellooo\n", (char*) shm->S[message_index].buf[i]);
         ((OSMP_Datatype*) buf)[i] = shm->S[message_index].buf[i];
@@ -268,16 +271,18 @@ int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
     printf("vor sem_empty_inbox\n");
     sem_wait(&shm->empty_inbox[dest]);      // Warten, bis Inbox nicht mehr voll ist
     printf("nach sem_empty_inbox\n");
+    sem_wait(&shm->mutex_inbox[dest]);
     if (shm->first_inbox[dest] == -1) {     // Keine Nachrichten in der Inbox
         shm->first_inbox[dest] = message_index;
     }
     else {      // Nachrichten in der Inbox vorhanden
         change_next_message_index(index_last_message_of_dest, message_index);
     }
-    printf("nach ifelse\n");
+
     change_next_message_index(message_index, NO_NEXT_MESSAGE);    //nicht unbedingt nötig - Zu besseren Leserlichkeit
-    printf("next msg index\n");
+
     shm->last_inbox[dest] = message_index;
+    sem_post(&shm->mutex_inbox[dest]);
     sem_post(&shm->full_inbox[dest]);
     printf("Send finished\n");
     return OSMP_SUCCESS;
@@ -294,14 +299,16 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
     OSMP_Rank(&recv_index);
     if (check_message_len(count, datatype) == OSMP_FAIL) return OSMP_FAIL;
 
-
     // Blockieren bei leerer Inbox, bis Nachricht kommt
+    sem_wait(&shm->mutex_inbox[recv_index]);
     if (shm->first_inbox[recv_index] == -1) {
         printf("Prozess %d: Inbox ist noch leer \n", recv_index);
-        return OSMP_INBOX_EMPTY;
+        return OSMP_FAIL;
     }
     int message_index = shm->first_inbox[recv_index];
     sem_wait(&shm->full_inbox[recv_index]);
+    sem_post(&shm->mutex_inbox[recv_index]);
+
     if (shm->S[message_index].type != datatype) {
         printf("Der Datentyp der Nachricht stimmt nicht mit dem angegebenen Datentypen überein\n");
         return OSMP_FAIL;
@@ -311,7 +318,8 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
     printf("Sender: %d\n", shm->S[message_index].sender);
     printf("Empfänger: %d\n", shm->S[message_index].receiver);
     printf("Tatsächlicher Empfänger %d\n", recv_index);
-//    printf("Nachricht: %s\n", (char*)shm->S[message_index].buf); //funktioniert
+    printf("Nachricht: %s\n", (char*)shm->S[message_index].buf);
+    fflush(stdout);
 
     *len = (int) (shm->S[message_index].type * (unsigned int) count);
 
@@ -322,7 +330,8 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
     // Inbox verwalten
     move_first_inbox_to_free_slots(recv_index);
     sem_post(&shm->empty_inbox[recv_index]);
-
+    printf("first_inbox_slots\n");
+    fflush(stdout);
 
     return OSMP_SUCCESS;
 }
@@ -428,8 +437,9 @@ int OSMP_CreateRequest(OSMP_Request* request){
 
 
 
-
 int OSMP_RemoveRequest(OSMP_Request* request){
+    printf("remove request called\n");
+    fflush(stdout);
     OSMP_Request_t *req = (OSMP_Request_t*) *request;
     if (req->status == OSMP_REQUEST_WORKING) {
         return OSMP_FAIL;
@@ -444,11 +454,11 @@ void thread_set_working(OSMP_Request_t* request){
 }
 
 void thread_set_finished(OSMP_Request_t* request, int return_value){
-    printf("request status geaendert zu %d\n", request->status);
-    printf("OSMP_REQUEST_ERROR: %d", OSMP_REQUEST_ERROR);
-    printf("OSMP_REQUEST_READY: %d", OSMP_REQUEST_READY);
-    printf("OSMP_REQUEST_FINISHED: %d", OSMP_REQUEST_FINISHED);
-    printf("OSMP_REQUEST_WORKING: %d", OSMP_REQUEST_WORKING);
+//    printf("request status geaendert zu %d\n", request->status);
+//    printf("OSMP_REQUEST_ERROR: %d", OSMP_REQUEST_ERROR);
+//    printf("OSMP_REQUEST_READY: %d", OSMP_REQUEST_READY);
+//    printf("OSMP_REQUEST_FINISHED: %d", OSMP_REQUEST_FINISHED);
+//    printf("OSMP_REQUEST_WORKING: %d", OSMP_REQUEST_WORKING);
 
     if (return_value == OSMP_FAIL){
         request->status = OSMP_REQUEST_ERROR;
@@ -460,32 +470,43 @@ void thread_set_finished(OSMP_Request_t* request, int return_value){
 
 
 void* thread_send(void* request) {
+
+    printf("Request als Hex(in Funktion): %x\n", request);
+
     OSMP_Request_t* req = (OSMP_Request_t*) request;
+
+    printf("Request als Hex(nach Cast): %x\n", req);
+
     printf("Thread send started\n");
     printf("\t\t\t request_dest: %d\n", req->dest);
+    fflush(stdout);
     thread_set_working(req);
 
     int rv = OSMP_Send(req->buffer, req->count,req->datatype, req->dest);
     if(rv == OSMP_FAIL){
         printf("OSMP_Send in thread_send failed\n");
+        fflush(stdout);
     }
-    printf("OSMP_Send finished\n");
+    printf("OSMP_Send finished, buffer: %s\n", (char*) req->buffer);
     thread_set_finished(req, rv);
     return NULL;
 }
 
 
 void* thread_recv(void* request) {
+    printf("Thread recv opened\n");
 
     OSMP_Request_t* req = (OSMP_Request_t*) request;
+    fflush(stdout);
     thread_set_working(req);
 
     int rv = OSMP_Recv(req->buffer, req->count, req->datatype, req->source, req->len);
 
     if(rv == OSMP_FAIL){
-        printf("OSMP_Send in thread_send failed\n");
+        printf("OSMP_Recv in thread_recv failed\n");
     }
-
+    printf("nach OSMP_Recv\n");
+    fflush(stdout);
     thread_set_finished(req, rv);
     return NULL;
 }
@@ -493,6 +514,7 @@ void* thread_recv(void* request) {
 
 int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSMP_Request request) {
     printf("ISend opened\n");
+    fflush(stdout);
     OSMP_Request_t* req = (OSMP_Request_t*) request;
     if (check_shm_null() == OSMP_FAIL)
         return OSMP_FAIL;
@@ -509,13 +531,15 @@ int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
     printf("Request als Hex: %x\n", req);
 
     printf("reqbuffer:%s buf:%s reqdest: %d dest: %d\n", (char*) req->buffer, (char*) buf, req->dest, dest);
-
+    fflush(stdout);
     pthread_t tid;
 
     if (pthread_create(&tid, NULL, thread_send, req) != 0){
         printf("Error pthread_create ISend\n");
+        fflush(stdout);
         return OSMP_FAIL;
     }
+    printf("nach pthread_create\n");
     req->tid = tid;
 
     //TODO linstert?
@@ -523,6 +547,8 @@ int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
 }
 
 int OSMP_Irecv(void *buf, int count, OSMP_Datatype datatype,int *source, int *len, OSMP_Request request){
+    printf("IRecv started\n");
+    fflush(stdout);
     OSMP_Request_t* req = (OSMP_Request_t*) request;
 
     if (check_shm_null() == OSMP_FAIL)
@@ -534,15 +560,22 @@ int OSMP_Irecv(void *buf, int count, OSMP_Datatype datatype,int *source, int *le
     pthread_t tid;
 
 
+    printf("vor prthread_create recv\n");
+    fflush(stdout);
     int return_value = pthread_create(&tid, NULL, thread_recv, req);
     if (return_value != 0) {
-        fprintf(stderr, "Error pthread_create IRecv\n");
+        printf("Error pthread_create IRecv\n");
+        fflush(stdout);
+        return OSMP_FAIL;
     }
+    printf("nach pthread_create recv\n");
+    fflush(stdout);
 
     req->tid = tid;
     source = req->source;
     len = req->len;
     buf = req->buffer;
+    printf("buf nach recv: %s, reqbuf: %s\n", (char*) req->buffer, (char*) buf);
     return OSMP_SUCCESS;
 
 }
