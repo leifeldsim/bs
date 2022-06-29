@@ -16,6 +16,9 @@ int main(int argc,char *argv[]) {
     OSMP_Rank(&preRank);
     printf("preRank: %d\n", preRank);
 
+    int size;
+    OSMP_Size(&size);
+
     if(OSMP_Init(&argc, &argv) == OSMP_FAIL){
         printf("Error OSMP_Init\n");
         fflush(stdout);
@@ -29,7 +32,7 @@ int main(int argc,char *argv[]) {
         return -1;
     }
 
-    int size;
+
     if(OSMP_Size(&size) == OSMP_FAIL){
         printf("Error OSMP_Size\n");
         fflush(stdout);

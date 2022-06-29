@@ -1,34 +1,34 @@
 - [ ] Sind alle Testprogramme lt. Anleitung zusammen mit der OSMP-Lib fehlerfrei kompilierbar und ausführbar?
 - Natürlich
 ---
-- [ ] Was passiert wenn OSM OSMP-Funktionen ohne vorheriges OSMP_Init, oder nach OSMP_Finalize aufgerufen werden, oder wenn die Funktionen fehlschlagen?
+- [x] Was passiert wenn OSM OSMP-Funktionen ohne vorheriges OSMP_Init, oder nach OSMP_Finalize aufgerufen werden, oder wenn die Funktionen fehlschlagen?
 -  OSMP-Fail mit textausgabe
 ---
-- [ ] Wie skalieren Ihre Datenstrukturen mit veränderten Größen? Welche Laufzeiten ergeben sich?
-- ???
+- [x] Wie skalieren Ihre Datenstrukturen mit veränderten Größen? Welche Laufzeiten ergeben sich?
+- Größe immer fixed durch maximale Prozessmenge
 ---
-- [ ] Was passiert, nachdem das Limit der zu empfangenden Nachrichten pro Prozess erreicht wurde.
-- OSMP Fail mit Textausgabe
+- [x] Was passiert, nachdem das Limit der zu empfangenden Nachrichten pro Prozess erreicht wurde.
+- Der nächste Sender wartet im Send bis er wieder senden darf
 ---
 - [x] Wie wird mit Nachrichten verfahren, die die maximal erlaubte Länge beim Senden oder Empfangen überschreiten?
 - Senden: wird nicht erlaubt und mit fail zurückgewiesen
 - empfangen: wird nicht erlaubt und mit fail zurückgewiesen -> wenn len > max_len
 ---
-- [ ] Was passiert, wenn ein Sender einem nicht vorhandenen Prozess eine Nachricht sendet und ist es möglich oder sinnvoll, das Messages an bereits beendete Empfänger gesendet werden?
+- [x] Was passiert, wenn ein Sender einem nicht vorhandenen Prozess eine Nachricht sendet und ist es möglich oder sinnvoll, das Messages an bereits beendete Empfänger gesendet werden?
 - beim abmelden -> messages werden wieder in empty gepackt
-- Zu hohe ids werden zurückgewiesen
-- Array für angemeldete Nutzer prüfen -> bei 0 kein senden möglich
+- Nicht zugewiesene ranks werden als Error zurückgegeben
+- Array für angemeldete Nutzer prüfen -> bei 0/-1 kein senden möglich
 ---
-- [ ] Kann man einem Prozess eine Nachricht senden, während er eine Nachricht liest?
+- [x] Kann man einem Prozess eine Nachricht senden, während er eine Nachricht liest?
 - Wartet auf den Mutex zum schreiben
 ---
-- [ ] Wie reagiert Ihre Bibliothek, wenn mehrere Prozesse gleichzeitig eine Nachricht an den selben Empfänger senden?
+- [x] Wie reagiert Ihre Bibliothek, wenn mehrere Prozesse gleichzeitig eine Nachricht an den selben Empfänger senden?
 - Mutex regelt hoffentlich
 ---
-- [ ] Was passiert, wenn der OSMP-Typ der Nachricht beim Senden oder Empfangen nicht einem erwarten OSMP-Typ entspricht?
+- [x] Was passiert, wenn der OSMP-Typ der Nachricht beim Senden oder Empfangen nicht einem erwarten OSMP-Typ entspricht?
 - wird zurückgewiesen mit fail
 ---
-- [ ] Was passiert mit bereits im Posteingang abgelegten Nachrichten, wenn der Empfänger sich mit OSMP_Finalize abmeldet und sich ggf. später wieder anmeldet?
+- [x] Was passiert mit bereits im Posteingang abgelegten Nachrichten, wenn der Empfänger sich mit OSMP_Finalize abmeldet und sich ggf. später wieder anmeldet?
 - Nachrichten werden "gefreed"
 ---
 - [ ] Lassen sich OSMP-Funktionen parallel aufrufen wenn der Anwender Threads verwendet?
@@ -40,15 +40,16 @@
 - [ ] Werden alle System-Ressourcen freigegeben?  Wo und Wann?
 - noch nicht
 ---
-- [ ] Führen alle blockierenden Aufrufe zur Blockierung, solange die zugehörigen Bedingungen nicht erfüllt sind? Weisen sie durch Belasten des Systems ggf. nach ob es immer funktioniert.
--
+- [x] Führen alle blockierenden Aufrufe zur Blockierung, solange die zugehörigen Bedingungen nicht erfüllt sind? 
+Weisen sie durch Belasten des Systems ggf. nach ob es immer funktioniert.
+- 
 ---
-- [ ] Was passiert wenn sie eine Barriere aufrufen, wenn sich vorher bereits ein Prozess beendet hat?
-- Durch das 2. anwesenheitsarray wird die Anzahl an Prozessen gelesen und full/empty angepasst
-- was tun wenn er sich währenddessen einfach abmeldet?
+- [x] Was passiert wenn sie eine Barriere aufrufen, wenn sich vorher bereits ein Prozess beendet hat?
+- Barrier kann nicht mehr aufgerufen werden, wenn ein Prozess finalize aufgerufen hat
 ---
-- [ ] Sind bei der Verwendung ihrer OSMP-Lib Deadlocks oder Race-Conditions möglich?
-- Natürlich nicht!
+- [x] Sind bei der Verwendung ihrer OSMP-Lib Deadlocks oder Race-Conditions möglich?
+- Send wartet darauf, dass er senden darf und barrier wartet auf den Sender
+- Man könnte mit einem Mutex die Nutzung von Barrier blockieren, wenn ein Prozess potenziell zu einem Deadlock landet
 ---
 - [ ] Wie kann der Aufrufer eines asynchronen Send oder Receive erfahren ob und welcher Fehler bei dem im Hintergrund ausgeführten Auftrags aufgetreten ist?
 - Error flag mit irgendwelchen ints drinne

@@ -60,7 +60,7 @@ int main(int argc,char *argv[]) {
     //else{
     //    printf("Process %d received from %d: %s\n", rank, src, recv);
     //}
-
+    OSMP_Barrier();
     test_OSMP_Finalize();
 
     return 0;

@@ -30,7 +30,8 @@ int main(int argc, char *argv[]) {
 
 
 
-
+//NOINIT
+//StuffafterFinalize
 int main(int argc, char *argv[]) {
 
     int rv = -1;
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
 
 
 
-
+//LEn to long
 int main(int argc, char *argv[]) {
 
     if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
 
 
 
-
+//send an nicht vorhandene Prozesse
 int main(int argc, char *argv[]) {
 
     if(OSMP_Init(&argc, &argv) == OSMP_ERROR)
@@ -137,7 +138,7 @@ int main(int argc, char *argv[]) {
 
 
 
-
+//NULL übergeben
 int main(int argc, char *argv[]) {
 
     if(OSMP_Init(&argc, &argv) == OSMP_ERROR)

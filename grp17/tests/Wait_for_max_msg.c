@@ -44,6 +44,6 @@ int main(int argc,char *argv[]) {
 
     }
     //OSMP_Recv(recv, count, OSMP_CHAR, &source, &len);
-
+    test_OSMP_Finalize();
 
 }

@@ -46,3 +46,11 @@ target_link_libraries(testBarrier rt pthread)
 add_executable(test_wait_for_max_msg tests/Wait_for_max_msg.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
 target_link_libraries(test_wait_for_max_msg rt pthread)
 
+add_executable(test_all_send_to_proc_0 tests/all_send_to_proc_0.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
+target_link_libraries(test_all_send_to_proc_0 rt pthread)
+
+add_executable(test_send_recv_different_datatypes tests/send_recv_different_datatypes.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
+target_link_libraries(test_send_recv_different_datatypes rt pthread)
+
+add_executable(test_check_blocking_functions tests/check_blocking_functions.c OSMPLib/OSMPLib.c OSMPLib/OSMPLib.h tests/Error_handling_OSMPLib/error_handling_OSMPLib.c tests/Error_handling_OSMPLib/error_handling_OSMPLib.h)
+target_link_libraries(test_check_blocking_functions rt pthread)

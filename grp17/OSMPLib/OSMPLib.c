@@ -21,6 +21,14 @@ int check_message_len(int count, OSMP_Datatype datatype) {
     return OSMP_SUCCESS;
 }
 
+int check_shm_null() {
+    if (shm == NULL) {
+        printf("Der Prozess wurde noch nicht initialisiert\n");
+        return OSMP_FAIL;
+    }
+    return OSMP_SUCCESS;
+}
+
 void debug_print(char specification[], char value[]) {
     int rank;
     OSMP_Rank(&rank);
@@ -128,9 +136,8 @@ int OSMP_Init(int *argc, char ***argv) {
 
 
 int OSMP_Size(int *size) {
-    if(shm == NULL){
+    if (check_shm_null() == OSMP_FAIL)
         return OSMP_FAIL;
-    }
     *size = shm->count_procs;
     return OSMP_SUCCESS;
 }
@@ -139,9 +146,8 @@ int OSMP_Size(int *size) {
 
 
 int OSMP_Rank(int *rank) {
-    if(shm == NULL){
+    if (check_shm_null() == OSMP_FAIL)
         return OSMP_FAIL;
-    }
     for(int i = 0; i < shm->count_procs; i++){
         if(shm->proc_ids[i] == getpid()){
             *rank = i;
@@ -237,6 +243,8 @@ int move_first_inbox_to_free_slots(int inbox_index) {
 
 
 int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     printf("OSMP_Send called with params: count: %d dest: %d msg:%s\n", count, dest, (const char*) buf);
     fflush(stdout);
 
@@ -258,7 +266,7 @@ int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
     write_into_message(message_index, rank, dest, datatype, buf, count);
     // Receiver Inbox neu verbinden
     printf("vor sem_empty_inbox\n");
-    sem_wait(&shm->empty_inbox[dest]);
+    sem_wait(&shm->empty_inbox[dest]);      // Warten, bis Inbox nicht mehr voll ist
     printf("nach sem_empty_inbox\n");
     if (shm->first_inbox[dest] == -1) {     // Keine Nachrichten in der Inbox
         shm->first_inbox[dest] = message_index;
@@ -278,6 +286,9 @@ int OSMP_Send(const void *buf, int count, OSMP_Datatype datatype, int dest) {
 
 
 int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *len) {
+
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     // Rank besorgen
     int recv_index;
     OSMP_Rank(&recv_index);
@@ -289,11 +300,10 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
         printf("Prozess %d: Inbox ist noch leer \n", recv_index);
         return OSMP_INBOX_EMPTY;
     }
-
     int message_index = shm->first_inbox[recv_index];
-
+    sem_wait(&shm->full_inbox[recv_index]);
     if (shm->S[message_index].type != datatype) {
-        printf("Der Datentyp der Nachricht stimmt nicht mit dem angegebenen Datentypen überein");
+        printf("Der Datentyp der Nachricht stimmt nicht mit dem angegebenen Datentypen überein\n");
         return OSMP_FAIL;
     }
 
@@ -311,6 +321,8 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
 
     // Inbox verwalten
     move_first_inbox_to_free_slots(recv_index);
+    sem_post(&shm->empty_inbox[recv_index]);
+
 
     return OSMP_SUCCESS;
 }
@@ -319,6 +331,8 @@ int OSMP_Recv(void *buf, int count, OSMP_Datatype datatype, int *source, int *le
 int OSMP_Bcast(void *buf, int count, OSMP_Datatype datatype, int root){
     int msg_index;
 
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
 
     int rank;
     OSMP_Rank(&rank);
@@ -480,7 +494,8 @@ void* thread_recv(void* request) {
 int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSMP_Request request) {
     printf("ISend opened\n");
     OSMP_Request_t* req = (OSMP_Request_t*) request;
-
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     if (check_request_send(req) == OSMP_FAIL) return OSMP_FAIL;
     if (check_message_len(count, datatype) == OSMP_FAIL) return OSMP_FAIL;
     if (check_non_reachable_rank(dest) == OSMP_FAIL) return OSMP_FAIL;
@@ -510,6 +525,8 @@ int OSMP_Isend(const void *buf, int count, OSMP_Datatype datatype, int dest, OSM
 int OSMP_Irecv(void *buf, int count, OSMP_Datatype datatype,int *source, int *len, OSMP_Request request){
     OSMP_Request_t* req = (OSMP_Request_t*) request;
 
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     if (check_request_recv(req) == OSMP_FAIL) return OSMP_FAIL;
 
     req->count = count;
@@ -532,20 +549,24 @@ int OSMP_Irecv(void *buf, int count, OSMP_Datatype datatype,int *source, int *le
 
 int remove_all_messages_from_inbox(int inbox_index) {
     int rv;
+    int num_of_removed_msg = 0;
     //printf("Prozess %d: Vor dem Removen von allen Nachrichten ist die Inbox bei %d\n", inbox_index, shm->first_inbox[inbox_index]);
 
     while (shm->first_inbox[inbox_index] > -1) {
         rv = move_first_inbox_to_free_slots(inbox_index);
         if (rv != OSMP_SUCCESS) return rv;
+        num_of_removed_msg++;
     }
     //printf("Prozess %d: Nach dem Removen von allen Nachrichten ist die Inbox bei %d\n", inbox_index, shm->first_inbox[inbox_index]);
 
-
+    printf("Es wurden beim Finalize %d Nachrichten entfernt\n", num_of_removed_msg);
     return OSMP_SUCCESS;
 }
 
 
 int OSMP_Finalize(void) {
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     int rank;
     OSMP_Rank(&rank);
     shm->process_ready[rank] = PROCESS_NOT_READY;
@@ -553,6 +574,7 @@ int OSMP_Finalize(void) {
     get_num_of_active_procs(&num_ready_procs);
 
     printf("Prozess %d hat finalize aufgerufen. %d\n", rank, num_ready_procs);
+    remove_all_messages_from_inbox(rank);
 
     if(munmap(shm, TEMP_LENGTH) == -1){
         printf("Error child: munmap");
@@ -574,6 +596,8 @@ int has_any_process_signed_off(){
 }
 
 int OSMP_Barrier() {
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     if(has_any_process_signed_off()){
         printf("Barrier nicht mehr möglich nachdem sich ein Prozess abgemeldet hat!\n");
         return OSMP_FAIL;
@@ -602,6 +626,8 @@ int OSMP_Barrier() {
 }
 
 int OSMP_Test(OSMP_Request request, int *flag){
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     //todo status von request in flag schreiben und dirket returnen
     OSMP_Request_t* req = (OSMP_Request_t*) request;
     *flag = req->status;
@@ -609,6 +635,8 @@ int OSMP_Test(OSMP_Request request, int *flag){
 }
 
 int OSMP_Wait (OSMP_Request request){
+    if (check_shm_null() == OSMP_FAIL)
+        return OSMP_FAIL;
     //todo solange warten bis request.status finished ist und danach returnen
     OSMP_Request_t* req = (OSMP_Request_t*) request;
     //vielleicht auf pthread umstellen
