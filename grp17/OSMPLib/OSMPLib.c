@@ -8,12 +8,8 @@
 #include "semaphore.h"
 #include <errno.h>
 #include <pthread.h>
-#include <sys/wait.h>
-
-#define SLEEPTIMER 10
 
 char* shm_name;
-int procs_to_start;
 struct shared_memory *shm;
 
 
@@ -34,15 +30,16 @@ void debug_print(char specification[], char value[]) {
 
 //Feststellen, ob Request bereit zum Arbeiten ist
 int check_request_send(OSMP_Request_t* request) {
+    OSMP_Request_t* req = (OSMP_Request_t*) request;
     printf("check request start\n");
-    if (request == NULL) {
+    if (req == NULL) {
         fprintf(stderr, "Request is null\n");
         return OSMP_FAIL;
     }
     printf("nach if\n");
 
-    int status = request->status;
-    printf("nach status abfrage: %d\n", request->status);
+    int status = req->status;
+    printf("nach status abfrage: %d\n", req->status);
     if (status != OSMP_REQUEST_READY) {
         if (status == OSMP_REQUEST_FINISHED) printf("Request wurde noch nicht ausgelesen\n");
         if (status == OSMP_REQUEST_ERROR) printf("Thread konnte seine Aufgabe nicht erledigen\n");
@@ -56,13 +53,14 @@ int check_request_send(OSMP_Request_t* request) {
 
 
 int check_request_recv(OSMP_Request_t* request) {
-    if (request == NULL) {
+    OSMP_Request_t* req = (OSMP_Request_t*) request;
+    if (req == NULL) {
         fprintf(stderr, "Request is null\n");
         return OSMP_FAIL;
     }
 
-    int status = request->status;
-    OSMP_Wait(request);
+    int status = req->status;
+//    OSMP_Wait(request);
     if (status != OSMP_REQUEST_FINISHED) {
         if (status == OSMP_REQUEST_READY) printf("Buffer wurde schon ausgelesen/noch nicht befüllt\n");
         if (status == OSMP_REQUEST_ERROR) printf("Thread konnte seine Aufgabe nicht erledigen\n");
@@ -94,7 +92,6 @@ int check_non_reachable_rank(int proc_rank) {
 
 
 int OSMP_Init(int *argc, char ***argv) {
-    procs_to_start = atoi(argv[0][1]);
     shm_name = argv[0][3];
 
     int file_descriptor = shm_open(shm_name, O_RDWR, 0640);
@@ -231,6 +228,8 @@ int move_first_inbox_to_free_slots(int inbox_index) {
     add_message_to_empty_slots(message_index);
     sem_post(&shm->full_inbox[inbox_index]);
     sem_wait(&shm->full_inbox[inbox_index]);
+    //TODO return anpassen
+    return 0;
 }
 
 
@@ -660,7 +659,7 @@ int depr_is_free_slots_used() {
 }
 
 
-int get_num_of_active_procs(int *count){
+void get_num_of_active_procs(int *count){
     int active_count = 0;
     for(int i = 0; i < MAX_PROC; i++){
         if(shm->process_ready[i] == PROCESS_READY){

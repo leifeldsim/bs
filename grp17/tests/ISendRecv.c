@@ -29,7 +29,7 @@ int main(int argc,char *argv[]) {
     test_OSMP_Size(&size);
     printf("pid: %d: rank: %d, size = %d\n", getpid(), rank, size);
 
-    int dst = getRandomDest(rank, size);
+    int dst = rank;//TODO es gab fehler für proc 0 //getRandomDest(rank, size);
     int count = 50;
     char* recv = malloc((unsigned long) count);
     char *msg = calloc(sizeof(char), (unsigned long) count);

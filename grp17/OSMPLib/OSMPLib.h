@@ -77,7 +77,7 @@ void add_proc(pid_t pid);
 void write_into_message(int message_index, int sender, int receiver, OSMP_Datatype type, const void* buf, int buf_len);
 void change_next_message_index(int message_index, int new_index_of_next_message);
 int depr_is_free_slots_used();
-int get_num_of_active_procs(int *count);
+void get_num_of_active_procs(int *count);
 
 struct message{
     int sender;
