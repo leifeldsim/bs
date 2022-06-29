@@ -7,6 +7,8 @@ OSMP program with a simple pair of OSMP_Send/OSMP_Irecv calls
 * LAST MODIFICATION: Hans Effinger, March 01, 2022
 ******************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "OSMPLib/OSMPLib.h"
 #define SIZE 50
@@ -20,6 +22,7 @@ int main(int argc, char *argv[])
     rv = OSMP_Size( &size );
     rv = OSMP_Rank( &rank );
     if( size != 2 ) { /* Fehlerbehandlung */ }
+    OSMP_Barrier();
     if( rank == 0 )
     { // OSMP process 0
         bufin = malloc(SIZE);
@@ -38,6 +41,7 @@ int main(int argc, char *argv[])
 // do something important…
 // check if operation is completed and wait if not
         rv = OSMP_Wait( myrequest );
+        printf("buffer: %s\n", (char*) ((OSMP_Request_t*)myrequest)->buffer );
 // OSMP_Irecv() competed, use bufout
         rv = OSMP_RemoveRequest( &myrequest );
     }

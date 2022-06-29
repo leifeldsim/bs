@@ -29,7 +29,7 @@ int main(int argc,char *argv[]) {
     test_OSMP_Size(&size);
     printf("pid: %d: rank: %d, size = %d\n", getpid(), rank, size);
 
-    int dst = rank;//TODO es gab fehler für proc 0 //getRandomDest(rank, size);
+    int dst = 1;//rank;//TODO es gab fehler für proc 0 //getRandomDest(rank, size);
     int count = 50;
     char* recv = malloc((unsigned long) count);
     char *msg = calloc(sizeof(char), (unsigned long) count);
@@ -54,27 +54,25 @@ int main(int argc,char *argv[]) {
         fflush(stdout);
     }
 
-    OSMP_Barrier();
-
-    if (OSMP_Isend(msg, count, OSMP_CHAR, dst, req) == OSMP_FAIL) {
+    if (OSMP_Isend(msg, count, OSMP_CHAR, , req) == OSMP_FAIL) {
         printf("OSMP_ISend failed\n");
         return OSMP_FAIL;
     }
 
-    OSMP_Wait(request);
+    OSMP_Wait(req);
+    OSMP_Barrier();
 
-    if (OSMP_Irecv(recv, count, OSMP_CHAR, &src, &length, req) == OSMP_FAIL) {
+    if (OSMP_Recv(recv, count, OSMP_CHAR, &src, &length) == OSMP_FAIL) {
         printf("OSMP_IRecv failed\n");
         return OSMP_FAIL;
     }
 
-    printf("Process %d received from %d: %s\n", rank, *req->source, (char*) req->buffer);
+    printf("Process %d received from %d: %s\n", rank, *req->source, recv);
+    fflush(stdout);
 
     OSMP_RemoveRequest(request);
 
-    if(OSMP_Finalize() == OSMP_FAIL){
-        printf("OSMP_Finalize Error");
-    }
+    test_OSMP_Finalize();
 
     return 0;
 }
